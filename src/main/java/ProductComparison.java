@@ -1,6 +1,6 @@
 public class ProductComparison {
     private int id;
-    private int roadBikeId;
+    private RoadBike roadBike;
     private String size;
     private float price;
     private String url;
@@ -14,14 +14,6 @@ public class ProductComparison {
 
     public void setId(int id) {
         this.id = id;
-    }
-
-    public int getRoadBikeId() {
-        return roadBikeId;
-    }
-
-    public void setRoadBikeId(int roadBikeId) {
-        this.roadBikeId = roadBikeId;
     }
 
     public String getSize() {
@@ -46,5 +38,13 @@ public class ProductComparison {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public RoadBike getRoadBike() {
+        return roadBike;
+    }
+
+    public void setRoadBike(RoadBike roadBike) {
+        this.roadBike = roadBike;
     }
 }

@@ -2,6 +2,10 @@ public class WebScraper {
     BikesDao bikesDao;
     int scrapeDelay;
 
+    public WebScraper(int scrapeDelay) {
+        this.scrapeDelay = scrapeDelay;
+    }
+
     public BikesDao getBikesDao() {
         return bikesDao;
     }
@@ -12,9 +16,5 @@ public class WebScraper {
 
     public int getScrapeDelay() {
         return scrapeDelay;
-    }
-
-    public void setScrapeDelay(int scrapeDelay) {
-        this.scrapeDelay = scrapeDelay;
     }
 }
