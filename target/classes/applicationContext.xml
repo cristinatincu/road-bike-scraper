@@ -16,23 +16,33 @@
         <ref bean="wiggleScraper"/>
         <ref bean="tredzScraper"/>
         <ref bean="evansScraper"/>
-        <ref bean="cycleSolutionsScraper"/>
+        <ref bean="sigmaSportsScraper"/>
         <ref bean="chainReactionScraper"/>
     </util:list>
 
     <bean id="wiggleScraper" class="WiggleScraper">
+        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="tredzScraper" class="TredzScraper">
+        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="evansScraper" class="EvansScraper">
+        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
-    <bean id="cycleSolutionsScraper" class="CycleSolutionsScraper">
+    <bean id="sigmaSportsScraper" class="SigmaSportsScraper">
+        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="chainReactionScraper" class="ChainReactionScraper">
+        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="bikesDao" class="BikesDao">
@@ -43,22 +53,21 @@
         <property name="dataSource" ref="dataSource"/>
         <property name="mappingResources">
             <list>
-                <value>ProductComparison.hbm.xml</value>
-                <value>RoadBike.hbm.xml</value>
+                <value>dbMapping.hbm.xml</value>
             </list>
         </property>
         <property name="hibernateProperties">
             <value>
                 hibernate.current_session_context_class=thread
                 hibernate.connection.pool_size=5
-                hibernate.dialect=org.hibernate.dialect.HSQLDialect
+                hibernate.dialect=org.hibernate.dialect.MySQLDialect
                 hibernate.show_sql=true
             </value>
         </property>
     </bean>
 
     <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
-        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
         <property name="url" value="jdbc:mysql://localhost/price_comparison"/>
         <property name="username" value="ct"/>
         <property name="password" value="456871"/>

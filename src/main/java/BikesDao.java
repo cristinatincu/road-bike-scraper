@@ -1,5 +1,6 @@
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.pmw.tinylog.Logger;
 
 import java.util.List;
 
@@ -14,57 +15,44 @@ public class BikesDao {
 
     /** Adds a new road bike to the database */
     public void addRoadBike(RoadBike roadBike){
-        //Get a new Session instance from the session factory
         Session session = sessionFactory.getCurrentSession();
-
-        //Start transaction
         session.beginTransaction();
 
-        //Add university to database - will not be stored until we commit the transaction
-        session.save(roadBike);
+        Object result = session.createQuery("from RoadBike r where r.name = :name")
+                .setParameter("name", roadBike.getName() ).uniqueResult();
 
-        //Commit transaction to save it to database
-        session.getTransaction().commit();
+        if (result == null) {
+            session.save(roadBike);
+            session.getTransaction().commit();
+            Logger.info("Road bike added to database with ID: " + roadBike.getId());
+        } else {
+            RoadBike existingRoadBike = (RoadBike) result;
+            roadBike.setId(existingRoadBike.getId());
+            Logger.info("Bike already in database");
+        }
 
-        //Close the session and release database connection
         session.close();
-        System.out.println("Road bike added to database with ID: " + roadBike.getId());
     }
 
     public void addProductComparison(ProductComparison product) {
-        //Get a new Session instance from the session factory
-        Session session = sessionFactory.getCurrentSession();
-
-        //Start transaction
-        session.beginTransaction();
-
-        //Add university to database - will not be stored until we commit the transaction
-        session.save(product);
-
-        //Commit transaction to save it to database
-        session.getTransaction().commit();
-
-        //Close the session and release database connection
-        session.close();
-        System.out.println("Product added to database with ID: " + product.getId());
-
-    }
-
-
-    /** Lists all road bikes */
-    public void listRoadBikes(){
-        //Get a new Session instance from the session factory and start transaction
         Session session = sessionFactory.getCurrentSession();
         session.beginTransaction();
+        Logger.info("Road_bike id: " + product.getRoadBike().getId());
+        List result = session.createQuery("from ProductComparison r where r.roadBike = ?1 and r.size = ?2 and r.color = ?3")
+                .setParameter(1, product.getRoadBike() )
+                .setParameter(2, product.getSize())
+                .setParameter(3, product.getColor())
+                .list();
 
-        //Select all students and output their string representation
-        List<RoadBike> roadBikesList = session.createQuery("from RoadBike").getResultList();
-        for(RoadBike roadBike: roadBikesList){
-            System.out.println(roadBike.toString());
-        }
+        if (result.isEmpty()) {
+            session.save(product);
+            session.getTransaction().commit();
+            System.out.println("Product added to database with ID: " + product.getId());
+        } else
+            Logger.info("Comparison already in database");
 
-        //Close session and release database connection.
         session.close();
+
     }
 
 

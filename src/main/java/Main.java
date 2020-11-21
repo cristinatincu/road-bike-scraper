@@ -7,15 +7,9 @@ public class Main {
 
         ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
 
-        BikesDao bikesDao = (BikesDao) context.getBean("bikesDao");
+        ScraperManager scraperManager = (ScraperManager) context.getBean("scraperManager");
 
-        WiggleScraper scraper1 = new WiggleScraper(2000);
+        scraperManager.startScraping();
 
-        scraper1.setBikesDao(bikesDao);
-        try {
-            scraper1.scrapeBikes();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
     }
 }

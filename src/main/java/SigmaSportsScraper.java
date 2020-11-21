@@ -1,7 +1,5 @@
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
+import com.google.common.collect.Iterables;
 import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -10,16 +8,18 @@ import org.pmw.tinylog.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-public class TredzScraper extends WebScraper {
+public class SigmaSportsScraper extends WebScraper {
 
-    public TredzScraper(int scrapeDelay, BikesDao bikesDao) {
+    public SigmaSportsScraper(int scrapeDelay, BikesDao bikesDao) {
         super(scrapeDelay, bikesDao);
-
     }
 
+
+
     public void run(){
-        Logger.info("Tredz scraper starting");
+        Logger.info("Cycle Solutions scraper starting");
         stop = false;
         while(!stop) {
             try {
@@ -28,48 +28,45 @@ public class TredzScraper extends WebScraper {
                 ex.printStackTrace();
                 stop = true;
             }
+
             sleep(scrapeDelay);
         }
     }
 
     void scrape() throws Exception {
-        Document doc = Jsoup.connect("https://www.tredz.co.uk/road-bikes").get();
-        int pages = Integer.parseInt(doc.select(".page-number").last().text());
-        Logger.debug(pages + " pages found");
-        List<String> links = new ArrayList<String>();
-
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
 
-        for (int i = 1; i <= pages; i++) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get("https://www.tredz.co.uk/road-bikes/pgn/" + i);
-            sleep(2);
-            WebElement grid = driver.findElement(By.className("search-results"));
-            List<WebElement> pageLinks = grid.findElements(By.className("ga"));
-            for (WebElement pageLink: pageLinks)
-                if (pageLink.getAttribute("href") != null)
-                    links.add(pageLink.getAttribute("href"));
-            driver.close();
+        WebDriver gridDriver = new ChromeDriver(options);
+        gridDriver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+        gridDriver.get("https://www.sigmasports.com/bikes/road-bikes");
+        WebElement loadButton = gridDriver.findElement(By.id("js-listing-load-next"));
+
+        while (loadButton.isDisplayed()) {
+            loadButton.click();
+            sleep(3);
+        }
+        List<String> links = new ArrayList<String>();
+        List<WebElement> grid = gridDriver.findElements(By.className("js-product-link"));
+
+        for (WebElement pageLink: grid){
+            String url = pageLink.getAttribute("href");
+            if (url.contains("Road") && !url.contains("Electric"))
+                links.add(url);
         }
 
-        Logger.debug(links.size() + " bikes found");
+        gridDriver.close();
+
+        Logger.info(links.size() + " bikes found");
 
         for (String url: links) {
             WebDriver driver = new ChromeDriver(options);
             driver.get(url);
 
             sleep(2);
-            String name = "";
-            try {
-                name = driver.findElement(By.className("js-product-title")).getText();
-            } catch (NoSuchElementException ex) {
-                Logger.info("Bike unavailable: url");
-                driver.close();
-                continue;
-            }
-            String image = driver.findElement(By.id("js-product-image-zoom")).getAttribute("src");
-            String description = driver.findElement(By.className("description-specification-container")).getText();
+            String name = Iterables.getLast(driver.findElements(By.className("breadcrumbs__link"))).getText();
+            String image = driver.findElement(By.id("js-magic-zoom-img")).getAttribute("src");
+            String description = driver.findElement(By.cssSelector(".product-content__content--description")).getText();
             description = description.split("\n")[1];
 
             RoadBike roadBike = new RoadBike();
@@ -79,14 +76,15 @@ public class TredzScraper extends WebScraper {
 
             bikesDao.addRoadBike(roadBike);
 
-            List<WebElement> colors = driver.findElements(By.className("color"));
+            List<WebElement> colors = driver.findElements(By.className("swatch-colour"));
             if (colors.size() > 1)
                 for (WebElement color: colors) {
                     color.click();
-                    scrapePrice(driver, color.getText(), roadBike, url);
+                    sleep(2);
+                    scrapePrice(driver, color.getAttribute("data-original_colour"), roadBike, url);
                 }
             else
-                scrapePrice(driver, colors.get(0).getText(), roadBike, url);
+                scrapePrice(driver, colors.get(0).getAttribute("data-original_colour"), roadBike, url);
             driver.close();
         }
     };
@@ -97,16 +95,15 @@ public class TredzScraper extends WebScraper {
      * @param url - url of the product page
      */
     private void scrapePrice(WebDriver driver,String colorName, RoadBike roadBike, String url) {
-        WebElement sizesDiv = driver.findElement(By.className("sku-option"));
-        List<WebElement> sizes = sizesDiv.findElements(By.className("option-label"));
+        WebElement sizesDiv = driver.findElement(By.cssSelector(".product-variations__container:not(.hidden)"));
+        List<WebElement> sizes = sizesDiv.findElements(By.cssSelector(".product-variations__variation:not(.product-variations__variation--unavailable)"));
 
         for (WebElement element: sizes) {
             ProductComparison product = new ProductComparison();
             element.click();
 
             String size = element.getText();
-
-            String price = driver.findElement(By.className("value")).getText();
+            String price = driver.findElement(By.id("js-purchase-price")).getText();
             price = price.substring(1).replaceAll(",","");
 
             product.setPrice(Float.parseFloat(price));
@@ -118,5 +115,4 @@ public class TredzScraper extends WebScraper {
             bikesDao.addProductComparison(product);
         }
     }
-
 }

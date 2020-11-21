@@ -2,6 +2,7 @@ public class ProductComparison {
     private int id;
     private RoadBike roadBike;
     private String size;
+    private String color;
     private float price;
     private String url;
 
@@ -22,6 +23,14 @@ public class ProductComparison {
 
     public void setSize(String size) {
         this.size = size;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
     }
 
     public float getPrice() {
