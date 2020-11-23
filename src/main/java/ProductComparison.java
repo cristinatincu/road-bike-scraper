@@ -9,6 +9,14 @@ public class ProductComparison {
     public ProductComparison() {
     }
 
+    public ProductComparison(RoadBike roadBike, String size, String color, float price, String url) {
+        this.roadBike = roadBike;
+        this.size = size;
+        this.color = color;
+        this.price = price;
+        this.url = url;
+    }
+
     public int getId() {
         return id;
     }

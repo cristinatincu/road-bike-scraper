@@ -4,8 +4,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.pmw.tinylog.Logger;
 
-import java.util.List;
-
 /** Scraper for Wiggle.com */
 public class WiggleScraper extends WebScraper {
 
@@ -24,6 +22,7 @@ public class WiggleScraper extends WebScraper {
                 stop = true;
             }
 
+            Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
         }
     }
@@ -42,62 +41,46 @@ public class WiggleScraper extends WebScraper {
             Document itemDoc = Jsoup.connect(url).get();
 
             String name = itemDoc.select("#productTitle").text();
-            String image = itemDoc.select("#pdpGalleryImage").attr(("src"));
+            String imageUrl = itemDoc.select("#pdpGalleryImage").attr(("src"));
             String description = itemDoc.select(".bem-pdp__product-description--highlight").text();
 
-            RoadBike roadBike = new RoadBike();
-            roadBike.setImage_url(image);
-            roadBike.setName(name);
-            roadBike.setDescription(description);
+            RoadBike roadBike = new RoadBike(name, imageUrl, description);
 
             bikesDao.addRoadBike(roadBike);
 
-            Element color = itemDoc.select(".bem-sku-selector__option-label").get(0);
+            String color = itemDoc.select(".bem-sku-selector__option-label").first().text();
             // Checks if there are multiple colors available
-            if (color.text().contains("Select")) {
-
-                Elements colorSelector = itemDoc.select(".qa-colour-select");
-                Elements colors = colorSelector.select(".bem-sku-selector__option-group-item");
-
-                for (Element element : colors) {
-                    Elements prices = itemDoc.select(".js-size-selections");
-                    scrapePrice(prices, element.text(), roadBike, url);
-                }
+            if (color.contains("Select")) {
+                Elements colors = itemDoc.select(".qa-colour-select .bem-sku-selector__option-group-item");
+                for (Element element : colors)
+                    scrapePrice(itemDoc, element.text(), roadBike, url);
 
             } else {
-                String color_name = "";
+                String colorName = "";
                 // Some bikes have color label and color name in separate html elements
-                if (color.text().equals("Colour:"))
-                    color_name = itemDoc.select(".bem-sku-selector__option-label").get(1).text();
+                if (color.equals("Colour:"))
+                    colorName = itemDoc.select(".bem-sku-selector__option-label").get(1).text();
                 else
-                    color_name = color.text().substring(8);
-                Elements prices = itemDoc.select(".js-size-selections");
-                scrapePrice(prices, color_name, roadBike, url);
+                    colorName = color.substring(8);
+                scrapePrice(itemDoc, colorName, roadBike, url);
             }
         }
     }
 
     /** Finds price for each available size and adds it to product_comparison table
-     * @param prices - Jsoup document containing the information about sizes
-     * @param color_name - color of the road bike
+     * @param doc - Jsoup document of the road bike page
+     * @param colorName - color of the road bike
      * @param roadBike - the RoadBike object to link to in database
      * @param url - url of the product page
      */
-    private void scrapePrice(Elements prices, String color_name, RoadBike roadBike, String url) {
-        Elements sizes = prices.select(".bem-sku-selector__option-group-item");
+    private void scrapePrice(Document doc, String colorName, RoadBike roadBike, String url) {
+        Elements sizes = doc.select(".js-size-selections .bem-sku-selector__option-group-item");
         for (Element element: sizes) {
-            ProductComparison product = new ProductComparison();
-
             String size = element.select(".bem-sku-selector__size").text();
-
             String price = element.select(".bem-sku-selector__price").text();
             price = price.substring(1).replaceAll(",","");
 
-            product.setPrice(Float.parseFloat(price));
-            product.setSize(size);
-            product.setUrl(url);
-            product.setRoadBike(roadBike);
-            product.setColor(color_name);
+            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
 
             bikesDao.addProductComparison(product);
         }

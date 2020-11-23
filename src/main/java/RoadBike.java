@@ -6,6 +6,12 @@ public class RoadBike {
 
     public RoadBike() {}
 
+    public RoadBike(String name, String image_url, String description) {
+        this.name = name;
+        this.image_url = image_url;
+        this.description = description;
+    }
+
     public int getId() {
         return id;
     }

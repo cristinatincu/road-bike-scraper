@@ -22,7 +22,7 @@ public class ScraperManager {
 //            scraper.start();
 //        }
 
-        scraperList.get(4).start();
+        scraperList.get(3).start();
 
         Scanner scanner = new Scanner(System.in);
         String userInput = scanner.nextLine();

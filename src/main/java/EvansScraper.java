@@ -1,6 +1,7 @@
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -9,6 +10,7 @@ import org.pmw.tinylog.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class EvansScraper extends WebScraper {
 
@@ -26,7 +28,7 @@ public class EvansScraper extends WebScraper {
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
-
+            Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
         }
     }
@@ -34,56 +36,70 @@ public class EvansScraper extends WebScraper {
     void scrape() throws Exception {
         Document doc = Jsoup.connect("https://www.evanscycles.com/bikes/road-bikes").get();
         int pages = Integer.parseInt(doc.select(".MaxPageNumber").get(0).text());
+
         Logger.info(pages + " pages found");
-        List<String> links = new ArrayList<String>();
 
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
 
-        for (int i = 1; i <= pages; i++) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get("https://www.evanscycles.com/bikes/road-bikes#dcp=" + i + "&dppp=24&OrderBy=rank");
-            sleep(2);
-            List<WebElement> pageLinks = driver.findElements(By.className("ProductImageList"));
-            for (WebElement pageLink: pageLinks) {
-                String url = pageLink.getAttribute("href");
-                if (url.contains("road") && !url.contains("electric"))
-                    links.add(url);
+        WebDriver driver = new ChromeDriver(options);
+        driver.get("https://www.evanscycles.com/bikes/road-bikes");
+
+        for (int j = 0; j < pages; j++) {
+            if (j > 0) {
+                String nextPageRef = driver.findElement(By.className("swipeNextClick")).getAttribute("href");
+                driver.get(nextPageRef);
+                sleep(2);
             }
-            driver.close();
-        }
+            String pageURL = driver.getCurrentUrl();
 
-        Logger.info(links.size() + " bikes found");
+            int gridSize = driver.findElements(By.className("ProductImageList")).size();
+            for (int i = 0; i < gridSize; i++) {
+                WebElement item = driver.findElements(By.className("ProductImageList")).get(i);
+                String url = item.getAttribute("href");
+                item.click();
+                sleep(2);
 
-        for (String url: links) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get(url);
-
-            sleep(2);
-            String name = driver.findElement(By.className("last")).getText();
-
-            String image = driver.findElement(By.id("imgProduct")).getAttribute("src");
-            String description = driver.findElement(By.className("infoTabPage")).getText();
-            description = description.split("KEY FEATURES")[0];
-
-            RoadBike roadBike = new RoadBike();
-            roadBike.setImage_url(image);
-            roadBike.setName(name);
-            roadBike.setDescription(description);
-
-            bikesDao.addRoadBike(roadBike);
-
-            if (!driver.findElements(By.className("divColourImages")).isEmpty()) {
-                List<WebElement> colors = driver.findElements(By.className("colorImgli"));
-
-                for (WebElement color: colors) {
-                    color.click();
-                    scrapePrice(driver, roadBike, url);
+                String name = "";
+                try {
+                    name = driver.findElement(By.className("last")).getText();
+                } catch (NoSuchElementException ex) {
+                    Logger.info("Bike not available:" + url);
+                    driver.get(pageURL);
+                    sleep(2);
+                    continue;
                 }
-            } else
-                scrapePrice(driver, roadBike, url);
-            driver.close();
+
+                if (!name.contains("Road") || name.contains("Electric")) {
+                    driver.get(pageURL);
+                    sleep(2);
+                    continue;
+                }
+
+                String imageUrl = driver.findElement(By.id("imgProduct")).getAttribute("src");
+                String description = driver.findElement(By.className("infoTabPage")).getText();
+                description = description.split("KEY FEATURES")[0];
+
+                RoadBike roadBike = new RoadBike(name, imageUrl, description);
+
+                bikesDao.addRoadBike(roadBike);
+
+                if (!driver.findElements(By.className("divColourImages")).isEmpty()) {
+                    List<WebElement> colors = driver.findElements(By.className("colorImgli"));
+
+                    for (WebElement color: colors) {
+                        color.click();
+                        scrapePrice(driver, roadBike, url);
+                    }
+                } else
+                    scrapePrice(driver, roadBike, url);
+
+                driver.get(pageURL);
+                sleep(2);
+            }
         }
+        driver.close();
+
     };
 
     /** Finds price for each available size and adds it to product_comparison table
@@ -96,19 +112,13 @@ public class EvansScraper extends WebScraper {
         List<WebElement> sizes = driver.findElements(By.className("sizeButtonli"));
 
         for (WebElement element: sizes) {
-            ProductComparison product = new ProductComparison();
             element.click();
 
             String size = element.getAttribute("data-text");
-
             String price = driver.findElement(By.id("lblSellingPrice")).getText();
             price = price.substring(1).replaceAll(",","");
 
-            product.setPrice(Float.parseFloat(price));
-            product.setSize(size);
-            product.setUrl(url);
-            product.setRoadBike(roadBike);
-            product.setColor(colorName);
+            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
 
             bikesDao.addProductComparison(product);
         }

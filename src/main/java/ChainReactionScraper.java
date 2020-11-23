@@ -1,9 +1,6 @@
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchElementException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.pmw.tinylog.Logger;
@@ -26,63 +23,59 @@ public class ChainReactionScraper extends WebScraper{
                 scrape();
             } catch (Exception ex) {
                 ex.printStackTrace();
-                stop = true;
             }
+            Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
         }
     }
 
     void scrape() throws Exception {
-        Document doc = Jsoup.connect("https://www.chainreactioncycles.com/road-bikes").get();
-        int pages = Integer.parseInt(doc.select(".pagination").last().text());
-        Logger.debug(pages + " pages found");
-        List<String> links = new ArrayList<String>();
-
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
 
-        for (int i = 1; i <= pages; i++) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get("https://www.chainreactioncycles.com/road-bikes?page=" + i);
-            sleep(2);
-            List<WebElement> grid = driver.findElements(By.className("products_details_container"));
-            for (WebElement item: grid){
-                WebElement link = item.findElement(By.tagName("a"));
-                links.add(link.getAttribute("href"));
+        WebDriver driver = new ChromeDriver(options);
+        driver.get("https://www.chainreactioncycles.com/road-bikes");
+        driver.findElement(By.id("truste-consent-button")).click();
+        sleep(1);
+
+        int pages = driver.findElements(By.cssSelector("div.pagination > a")).size();
+        Logger.debug(pages + " pages found");
+
+        for (int j = 0; j < pages; j++) {
+            if (j > 0) {
+                    WebElement pageButton = driver.findElements(By.cssSelector("div.pagination > a")).get(j);
+                    pageButton.click();
             }
+            String pageURL = driver.getCurrentUrl();
 
-            driver.close();
-        }
+            int gridSize = driver.findElements(By.cssSelector("div.placeholder a")).size();
+            for (int i = 0; i < gridSize; i++) {
+                WebElement item = driver.findElements(By.cssSelector("div.placeholder a")).get(i);
+                String url = item.getAttribute("href");
+                item.click();
+                String name = driver.findElement(By.tagName("h1")).getText();
+                String imageUrl = driver.findElement(By.className("s7_zoomviewer_staticImage")).getAttribute("src");
+                String description = driver.findElement(By.id("crcPDPComponentDescription")).getText();
+                description = description.split("\n")[1];
 
-        Logger.debug(links.size() + " bikes found");
+                RoadBike roadBike = new RoadBike(name, imageUrl, description);
 
-        for (String url: links) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get(url);
+                bikesDao.addRoadBike(roadBike);
 
-            sleep(2);
-            String name = driver.findElement(By.tagName("h1")).getText();
-            String image = driver.findElement(By.className("s7_zoomviewer_staticImage")).getAttribute("src");
-            String description = driver.findElement(By.id("crcPDPComponentDescription")).getText();
-            description = description.split("\n")[1];
-
-            RoadBike roadBike = new RoadBike();
-            roadBike.setImage_url(image);
-            roadBike.setName(name);
-            roadBike.setDescription(description);
-
-            bikesDao.addRoadBike(roadBike);
-
-            List<WebElement> colors = driver.findElements(By.tagName("variant-option-color"));
-            if (colors.size() > 1)
-                for (WebElement color: colors) {
-                    color.click();
+                List<WebElement> colors = driver.findElements(By.className("variant-option-color"));
+                if (colors.size() > 1)
+                    for (WebElement color: colors) {
+                        color.click();
+                        scrapePrice(driver, roadBike, url);
+                    }
+                else
                     scrapePrice(driver, roadBike, url);
-                }
-            else
-                scrapePrice(driver, roadBike, url);
-            driver.close();
+
+                driver.get(pageURL);
+            }
         }
+        driver.close();
+
     };
 
     /** Finds price for each available size and adds it to product_comparison table
@@ -92,22 +85,18 @@ public class ChainReactionScraper extends WebScraper{
      */
     private void scrapePrice(WebDriver driver, RoadBike roadBike, String url) {
         String colorName = driver.findElement(By.className("crcPDPVariantLabelSelected")).getText();
-        List<WebElement> sizes = driver.findElements(By.className("variant-option-value"));
+        List<WebElement> sizes = driver.findElements(By.cssSelector("div.variant-option[data-variant='FramesSize']"));
 
         for (WebElement element: sizes) {
-            ProductComparison product = new ProductComparison();
-            element.click();
+            if (sizes.size() > 1 && !element.isDisplayed())
+                continue;
 
             String size = element.getText();
 
             String price = driver.findElement(By.className("crcPDPPriceCurrent")).getText();
             price = price.substring(1);
 
-            product.setPrice(Float.parseFloat(price));
-            product.setSize(size);
-            product.setUrl(url);
-            product.setRoadBike(roadBike);
-            product.setColor(colorName);
+            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
 
             bikesDao.addProductComparison(product);
         }

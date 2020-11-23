@@ -16,8 +16,6 @@ public class SigmaSportsScraper extends WebScraper {
         super(scrapeDelay, bikesDao);
     }
 
-
-
     public void run(){
         Logger.info("Cycle Solutions scraper starting");
         stop = false;
@@ -28,7 +26,7 @@ public class SigmaSportsScraper extends WebScraper {
                 ex.printStackTrace();
                 stop = true;
             }
-
+            Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
         }
     }
@@ -37,56 +35,60 @@ public class SigmaSportsScraper extends WebScraper {
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
 
-        WebDriver gridDriver = new ChromeDriver(options);
-        gridDriver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-        gridDriver.get("https://www.sigmasports.com/bikes/road-bikes");
-        WebElement loadButton = gridDriver.findElement(By.id("js-listing-load-next"));
+        WebDriver driver = new ChromeDriver(options);
+        driver.get("https://www.sigmasports.com/bikes/road-bikes?sort=popularity&p=1");
 
-        while (loadButton.isDisplayed()) {
-            loadButton.click();
+        while(true) {
+            String pageURL = driver.getCurrentUrl();
+            if (!pageURL.contains("sort=popularity"))
+                break;
+
+            int gridSize = driver.findElements(By.className("js-product-link")).size();
+            for (int i = 0; i < gridSize; i++) {
+                WebElement item = driver.findElements(By.className("js-product-link")).get(i);
+                String url = item.getAttribute("href");
+                driver.get(url);
+                sleep(2);
+
+                String name = Iterables.getLast(driver.findElements(By.className("breadcrumbs__link"))).getText();
+
+                if (!name.contains("Road") || name.contains("Electric") || name.contains("Frameset")) {
+                    driver.get(pageURL);
+                    sleep(2);
+                    continue;
+                }
+
+                String imageUrl = driver.findElement(By.id("js-magic-zoom-img")).getAttribute("src");
+                String description = driver.findElement(By.cssSelector(".product-content__content--description")).getText();
+                description = description.split("\n")[1];
+
+                RoadBike roadBike = new RoadBike(name, imageUrl, description);
+
+                bikesDao.addRoadBike(roadBike);
+
+                List<WebElement> colors = driver.findElements(By.className("swatch-colour"));
+                if (colors.size() > 1)
+                    for (WebElement color: colors) {
+                        color.click();
+                        sleep(2);
+                        scrapePrice(driver, color.getAttribute("data-original_colour"), roadBike, url);
+                    }
+                else if (colors.size() == 0) {
+                    driver.get(pageURL);
+                    sleep(2);
+                    continue;
+                } else
+                    scrapePrice(driver, colors.get(0).getAttribute("data-original_colour"), roadBike, url);
+
+                driver.get(pageURL);
+                sleep(2);
+            }
+
+            String nextPageRef = driver.findElement(By.cssSelector("#js-listing-load-next > a")).getAttribute("href");
+            driver.get(nextPageRef);
             sleep(3);
         }
-        List<String> links = new ArrayList<String>();
-        List<WebElement> grid = gridDriver.findElements(By.className("js-product-link"));
-
-        for (WebElement pageLink: grid){
-            String url = pageLink.getAttribute("href");
-            if (url.contains("Road") && !url.contains("Electric"))
-                links.add(url);
-        }
-
-        gridDriver.close();
-
-        Logger.info(links.size() + " bikes found");
-
-        for (String url: links) {
-            WebDriver driver = new ChromeDriver(options);
-            driver.get(url);
-
-            sleep(2);
-            String name = Iterables.getLast(driver.findElements(By.className("breadcrumbs__link"))).getText();
-            String image = driver.findElement(By.id("js-magic-zoom-img")).getAttribute("src");
-            String description = driver.findElement(By.cssSelector(".product-content__content--description")).getText();
-            description = description.split("\n")[1];
-
-            RoadBike roadBike = new RoadBike();
-            roadBike.setImage_url(image);
-            roadBike.setName(name);
-            roadBike.setDescription(description);
-
-            bikesDao.addRoadBike(roadBike);
-
-            List<WebElement> colors = driver.findElements(By.className("swatch-colour"));
-            if (colors.size() > 1)
-                for (WebElement color: colors) {
-                    color.click();
-                    sleep(2);
-                    scrapePrice(driver, color.getAttribute("data-original_colour"), roadBike, url);
-                }
-            else
-                scrapePrice(driver, colors.get(0).getAttribute("data-original_colour"), roadBike, url);
-            driver.close();
-        }
+        driver.close();
     };
 
     /** Finds price for each available size and adds it to product_comparison table
@@ -99,18 +101,13 @@ public class SigmaSportsScraper extends WebScraper {
         List<WebElement> sizes = sizesDiv.findElements(By.cssSelector(".product-variations__variation:not(.product-variations__variation--unavailable)"));
 
         for (WebElement element: sizes) {
-            ProductComparison product = new ProductComparison();
             element.click();
 
             String size = element.getText();
             String price = driver.findElement(By.id("js-purchase-price")).getText();
             price = price.substring(1).replaceAll(",","");
 
-            product.setPrice(Float.parseFloat(price));
-            product.setSize(size);
-            product.setUrl(url);
-            product.setRoadBike(roadBike);
-            product.setColor(colorName);
+            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
 
             bikesDao.addProductComparison(product);
         }
