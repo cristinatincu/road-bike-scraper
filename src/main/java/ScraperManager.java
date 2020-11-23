@@ -18,12 +18,9 @@ public class ScraperManager {
     }
 
     public void startScraping() {
-//        for (WebScraper scraper: scraperList) {
-//            scraper.start();
-//        }
-
-        scraperList.get(3).start();
-
+        for (WebScraper scraper: scraperList) {
+            scraper.start();
+        }
         Scanner scanner = new Scanner(System.in);
         String userInput = scanner.nextLine();
         while(!userInput.equals("stop")) {

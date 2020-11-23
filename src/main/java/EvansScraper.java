@@ -8,7 +8,6 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.pmw.tinylog.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +26,7 @@ public class EvansScraper extends WebScraper {
                 scrape();
             } catch (Exception ex) {
                 ex.printStackTrace();
+                stop = true;
             }
             Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
@@ -43,13 +43,13 @@ public class EvansScraper extends WebScraper {
         options.setHeadless(true);
 
         WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
         driver.get("https://www.evanscycles.com/bikes/road-bikes");
 
         for (int j = 0; j < pages; j++) {
             if (j > 0) {
                 String nextPageRef = driver.findElement(By.className("swipeNextClick")).getAttribute("href");
                 driver.get(nextPageRef);
-                sleep(2);
             }
             String pageURL = driver.getCurrentUrl();
 
@@ -58,30 +58,29 @@ public class EvansScraper extends WebScraper {
                 WebElement item = driver.findElements(By.className("ProductImageList")).get(i);
                 String url = item.getAttribute("href");
                 item.click();
-                sleep(2);
 
-                String name = "";
+                String name;
                 try {
                     name = driver.findElement(By.className("last")).getText();
                 } catch (NoSuchElementException ex) {
                     Logger.info("Bike not available:" + url);
                     driver.get(pageURL);
-                    sleep(2);
                     continue;
                 }
 
                 if (!name.contains("Road") || name.contains("Electric")) {
                     driver.get(pageURL);
-                    sleep(2);
                     continue;
                 }
+
+                name = name.split(" Road")[0].toUpperCase();
 
                 String imageUrl = driver.findElement(By.id("imgProduct")).getAttribute("src");
                 String description = driver.findElement(By.className("infoTabPage")).getText();
                 description = description.split("KEY FEATURES")[0];
 
                 RoadBike roadBike = new RoadBike(name, imageUrl, description);
-
+                Logger.info(roadBike);
                 bikesDao.addRoadBike(roadBike);
 
                 if (!driver.findElements(By.className("divColourImages")).isEmpty()) {
@@ -95,12 +94,11 @@ public class EvansScraper extends WebScraper {
                     scrapePrice(driver, roadBike, url);
 
                 driver.get(pageURL);
-                sleep(2);
             }
         }
         driver.close();
 
-    };
+    }
 
     /** Finds price for each available size and adds it to product_comparison table
      * @param driver - Jsoup document containing the information about sizes

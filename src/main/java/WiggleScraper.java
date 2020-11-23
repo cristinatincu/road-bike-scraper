@@ -26,7 +26,7 @@ public class WiggleScraper extends WebScraper {
             sleep(scrapeDelay);
         }
     }
-
+//TODO: tinylog usage
     /** Scrapes road bikes info and adds it to database
      * @throws Exception
      */
@@ -41,11 +41,12 @@ public class WiggleScraper extends WebScraper {
             Document itemDoc = Jsoup.connect(url).get();
 
             String name = itemDoc.select("#productTitle").text();
+            name = name.split(" Road")[0].toUpperCase();
             String imageUrl = itemDoc.select("#pdpGalleryImage").attr(("src"));
             String description = itemDoc.select(".bem-pdp__product-description--highlight").text();
 
             RoadBike roadBike = new RoadBike(name, imageUrl, description);
-
+            Logger.info(roadBike);
             bikesDao.addRoadBike(roadBike);
 
             String color = itemDoc.select(".bem-sku-selector__option-label").first().text();
@@ -56,7 +57,7 @@ public class WiggleScraper extends WebScraper {
                     scrapePrice(itemDoc, element.text(), roadBike, url);
 
             } else {
-                String colorName = "";
+                String colorName;
                 // Some bikes have color label and color name in separate html elements
                 if (color.equals("Colour:"))
                     colorName = itemDoc.select(".bem-sku-selector__option-label").get(1).text();

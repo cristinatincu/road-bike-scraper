@@ -1,19 +1,16 @@
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.pmw.tinylog.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class ChainReactionScraper extends WebScraper{
 
     public ChainReactionScraper(int scrapeDelay, BikesDao bikesDao) {
         super(scrapeDelay, bikesDao);
     }
-
 
     public void run(){
         Logger.info("Chain Reaction scraper starting");
@@ -23,24 +20,24 @@ public class ChainReactionScraper extends WebScraper{
                 scrape();
             } catch (Exception ex) {
                 ex.printStackTrace();
+                stop = true;
             }
             Logger.info("Scrape finished. Waiting " + scrapeDelay + " seconds");
             sleep(scrapeDelay);
         }
     }
-
+//TODO: exception handling
+    //TODO: document comments
     void scrape() throws Exception {
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
 
         WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
         driver.get("https://www.chainreactioncycles.com/road-bikes");
         driver.findElement(By.id("truste-consent-button")).click();
-        sleep(1);
 
         int pages = driver.findElements(By.cssSelector("div.pagination > a")).size();
-        Logger.debug(pages + " pages found");
-
         for (int j = 0; j < pages; j++) {
             if (j > 0) {
                     WebElement pageButton = driver.findElements(By.cssSelector("div.pagination > a")).get(j);
@@ -52,14 +49,20 @@ public class ChainReactionScraper extends WebScraper{
             for (int i = 0; i < gridSize; i++) {
                 WebElement item = driver.findElements(By.cssSelector("div.placeholder a")).get(i);
                 String url = item.getAttribute("href");
-                item.click();
-                String name = driver.findElement(By.tagName("h1")).getText();
+                jsClickExecutor(driver, item);
+
+                String name = driver.findElement(By.tagName("h1")).getText().replace("[\\(\\)']+","");
+                String[] nameSplits = name.split(" Road Bike");
+                name = "";
+                for (String el: nameSplits)
+                    name += el.toUpperCase();
+
                 String imageUrl = driver.findElement(By.className("s7_zoomviewer_staticImage")).getAttribute("src");
                 String description = driver.findElement(By.id("crcPDPComponentDescription")).getText();
                 description = description.split("\n")[1];
 
                 RoadBike roadBike = new RoadBike(name, imageUrl, description);
-
+                Logger.info(roadBike);
                 bikesDao.addRoadBike(roadBike);
 
                 List<WebElement> colors = driver.findElements(By.className("variant-option-color"));
@@ -76,7 +79,7 @@ public class ChainReactionScraper extends WebScraper{
         }
         driver.close();
 
-    };
+    }
 
     /** Finds price for each available size and adds it to product_comparison table
      * @param driver - Jsoup document containing the information about sizes
@@ -88,10 +91,10 @@ public class ChainReactionScraper extends WebScraper{
         List<WebElement> sizes = driver.findElements(By.cssSelector("div.variant-option[data-variant='FramesSize']"));
 
         for (WebElement element: sizes) {
-            if (sizes.size() > 1 && !element.isDisplayed())
+            if (!element.isDisplayed())
                 continue;
 
-            String size = element.getText();
+            String size = element.getText().split(" ")[0];
 
             String price = driver.findElement(By.className("crcPDPPriceCurrent")).getText();
             price = price.substring(1);

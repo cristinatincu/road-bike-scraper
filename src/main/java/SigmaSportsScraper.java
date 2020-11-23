@@ -6,7 +6,6 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.pmw.tinylog.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -36,6 +35,7 @@ public class SigmaSportsScraper extends WebScraper {
         options.setHeadless(true);
 
         WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
         driver.get("https://www.sigmasports.com/bikes/road-bikes?sort=popularity&p=1");
 
         while(true) {
@@ -48,48 +48,47 @@ public class SigmaSportsScraper extends WebScraper {
                 WebElement item = driver.findElements(By.className("js-product-link")).get(i);
                 String url = item.getAttribute("href");
                 driver.get(url);
-                sleep(2);
 
                 String name = Iterables.getLast(driver.findElements(By.className("breadcrumbs__link"))).getText();
 
                 if (!name.contains("Road") || name.contains("Electric") || name.contains("Frameset")) {
                     driver.get(pageURL);
-                    sleep(2);
                     continue;
                 }
+
+                String[] nameSplits = name.split(" Road Bike");
+                name = "";
+                for (String el: nameSplits)
+                    name += el.toUpperCase();
 
                 String imageUrl = driver.findElement(By.id("js-magic-zoom-img")).getAttribute("src");
                 String description = driver.findElement(By.cssSelector(".product-content__content--description")).getText();
                 description = description.split("\n")[1];
 
                 RoadBike roadBike = new RoadBike(name, imageUrl, description);
-
+                Logger.info(roadBike);
                 bikesDao.addRoadBike(roadBike);
 
                 List<WebElement> colors = driver.findElements(By.className("swatch-colour"));
                 if (colors.size() > 1)
                     for (WebElement color: colors) {
                         color.click();
-                        sleep(2);
                         scrapePrice(driver, color.getAttribute("data-original_colour"), roadBike, url);
                     }
                 else if (colors.size() == 0) {
                     driver.get(pageURL);
-                    sleep(2);
                     continue;
                 } else
                     scrapePrice(driver, colors.get(0).getAttribute("data-original_colour"), roadBike, url);
 
                 driver.get(pageURL);
-                sleep(2);
             }
 
             String nextPageRef = driver.findElement(By.cssSelector("#js-listing-load-next > a")).getAttribute("href");
             driver.get(nextPageRef);
-            sleep(3);
         }
         driver.close();
-    };
+    }
 
     /** Finds price for each available size and adds it to product_comparison table
      * @param driver - Jsoup document containing the information about sizes

@@ -46,11 +46,7 @@ public class RoadBike {
 
     @Override
     public String toString() {
-        return "RoadBike{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", image_url='" + image_url + '\'' +
-                ", description='" + description + '\'' +
-                '}';
+        return "Road Bike: " +
+                ", name='" + name;
     }
 }

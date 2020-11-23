@@ -21,27 +21,27 @@
     </util:list>
 
     <bean id="wiggleScraper" class="WiggleScraper">
-        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="0" value="300"/>
         <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="tredzScraper" class="TredzScraper">
-        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="0" value="300"/>
         <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="evansScraper" class="EvansScraper">
-        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="0" value="300"/>
         <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="sigmaSportsScraper" class="SigmaSportsScraper">
-        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="0" value="300"/>
         <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
     <bean id="chainReactionScraper" class="ChainReactionScraper">
-        <constructor-arg index="0" value="60"/>
+        <constructor-arg index="0" value="300"/>
         <constructor-arg index="1" ref="bikesDao"/>
     </bean>
 
@@ -61,7 +61,7 @@
                 hibernate.current_session_context_class=thread
                 hibernate.connection.pool_size=5
                 hibernate.dialect=org.hibernate.dialect.MySQLDialect
-                hibernate.show_sql=true
+                hibernate.show_sql=false
             </value>
         </property>
     </bean>

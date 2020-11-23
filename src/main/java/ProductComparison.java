@@ -1,3 +1,4 @@
+
 public class ProductComparison {
     private int id;
     private RoadBike roadBike;
@@ -63,5 +64,16 @@ public class ProductComparison {
 
     public void setRoadBike(RoadBike roadBike) {
         this.roadBike = roadBike;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ProductComparison that = (ProductComparison) o;
+        return roadBike.equals(that.roadBike) &&
+                size.equals(that.size) &&
+                color.equals(that.color) &&
+                url.equals(that.url);
     }
 }
