@@ -6,12 +6,13 @@
             <generator class="increment"/>
         </id>
         <property name="size" type="string" column="size"/>
-        <property name="price" type="float" column="price"/>
+        <property name="price" type="string" column="price"/>
         <property name="color" type="string" column="color"/>
         <property name="url" type="string" column="url"/>
+        <property name="name" type="string" column="name"/>
         <many-to-one name="roadBike" class="RoadBike"
                      column="road_bike_id"
-                     cascade="all"
+                     cascade="merge"
                      />
     </class>
 

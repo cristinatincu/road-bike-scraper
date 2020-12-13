@@ -4,13 +4,24 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.pmw.tinylog.Logger;
 
-/** Scraper for Wiggle.com */
+/**
+ * Web scraper for Wiggle website.
+ */
 public class WiggleScraper extends WebScraper {
 
+    /**
+     * @param scrapeDelay   seconds for delay between scraping
+     * @param bikesDao      object for database interaction
+     */
     public WiggleScraper(int scrapeDelay, BikesDao bikesDao) {
         super(scrapeDelay, bikesDao);
     }
 
+    /**
+     * Executes first when thread is started and starts scraping.
+     * If stop thread has been triggered then scraping stops after finishing.
+     * If an exception occurs during scraping then other threads receive the stop state.
+     */
     public void run(){
         Logger.info("Wiggle scraper starting");
         stop = false;
@@ -26,8 +37,13 @@ public class WiggleScraper extends WebScraper {
             sleep(scrapeDelay);
         }
     }
-//TODO: tinylog usage
-    /** Scrapes road bikes info and adds it to database
+
+    /**
+     * Scrapes road bikes and comparisons.
+     * Accesses every bike's page to scrape description, colors, sizes and price.
+     * Each found road bike is added to database
+     * and separate comparison objects are created for all available colors and sizes.
+     *
      * @throws Exception
      */
     public void scrape() throws Exception {
@@ -41,11 +57,11 @@ public class WiggleScraper extends WebScraper {
             Document itemDoc = Jsoup.connect(url).get();
 
             String name = itemDoc.select("#productTitle").text();
-            name = name.split(" Road")[0].toUpperCase();
             String imageUrl = itemDoc.select("#pdpGalleryImage").attr(("src"));
-            String description = itemDoc.select(".bem-pdp__product-description--highlight").text();
+            String description = itemDoc.select(".bem-pdp__product-description").text()
+                    .replace(" Read More", "");
 
-            RoadBike roadBike = new RoadBike(name, imageUrl, description);
+            RoadBike roadBike = new RoadBike(shortenName(name), imageUrl, description);
             Logger.info(roadBike);
             bikesDao.addRoadBike(roadBike);
 
@@ -54,7 +70,7 @@ public class WiggleScraper extends WebScraper {
             if (color.contains("Select")) {
                 Elements colors = itemDoc.select(".qa-colour-select .bem-sku-selector__option-group-item");
                 for (Element element : colors)
-                    scrapePrice(itemDoc, element.text(), roadBike, url);
+                    scrapePrice(itemDoc, element.text(), roadBike, url, name);
 
             } else {
                 String colorName;
@@ -63,27 +79,39 @@ public class WiggleScraper extends WebScraper {
                     colorName = itemDoc.select(".bem-sku-selector__option-label").get(1).text();
                 else
                     colorName = color.substring(8);
-                scrapePrice(itemDoc, colorName, roadBike, url);
+                scrapePrice(itemDoc, colorName, roadBike, url, name);
             }
         }
     }
 
-    /** Finds price for each available size and adds it to product_comparison table
-     * @param doc - Jsoup document of the road bike page
-     * @param colorName - color of the road bike
-     * @param roadBike - the RoadBike object to link to in database
-     * @param url - url of the product page
+    /**
+     * Finds price for each available size and adds it to product_comparison table.
+     *
+     * @param doc       loaded product page
+     * @param colorName color of the product
+     * @param roadBike  object from road_bike table to link the comparison to
+     * @param url       product page
+     * @param name      original bike name
      */
-    private void scrapePrice(Document doc, String colorName, RoadBike roadBike, String url) {
+    private void scrapePrice(Document doc, String colorName, RoadBike roadBike, String url, String name) {
         Elements sizes = doc.select(".js-size-selections .bem-sku-selector__option-group-item");
         for (Element element: sizes) {
-            String size = element.select(".bem-sku-selector__size").text();
-            String price = element.select(".bem-sku-selector__price").text();
-            price = price.substring(1).replaceAll(",","");
+            String size = element.select(".bem-sku-selector__size")
+                    .text().split(" ")[0];
+            size = size.replace("-", "");
+            if (size.contains("Small"))
+                size = size.replace("Small", "S");
+            else if (size.contains("Medium"))
+                size = size.replace("Medium", "M");
+            else if (size.contains("Large"))
+                size = size.replace("Large", "L");
 
-            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
+            String price = element.select(".bem-sku-selector__price").text();
+
+            ProductComparison product = new ProductComparison(roadBike, size, shortenColor(colorName), price, url, name);
 
             bikesDao.addProductComparison(product);
         }
     }
+
 }

@@ -1,3 +1,8 @@
+/**
+ * Class to represent a physical instance of a road bike.
+ * Each road bike has name, image and description.
+ * Mapped to road_bike table.
+ */
 public class RoadBike {
     private int id;
     private String name;
@@ -6,6 +11,11 @@ public class RoadBike {
 
     public RoadBike() {}
 
+    /**
+     * @param name          road bike name
+     * @param image_url     url of road bike image
+     * @param description   road bike description
+     */
     public RoadBike(String name, String image_url, String description) {
         this.name = name;
         this.image_url = image_url;
@@ -44,9 +54,13 @@ public class RoadBike {
         this.description = description;
     }
 
+    /**
+     * Uses name when object is printed.
+     *
+     * @return  road bike name
+     */
     @Override
     public String toString() {
-        return "Road Bike: " +
-                ", name='" + name;
+        return name;
     }
 }

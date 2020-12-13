@@ -1,21 +1,43 @@
-
+/**
+ * Comparisons of the same road bike from different online retailers.
+ * Each size - color combination of the same road bike has a separate instance.
+ * Mapped to product_comparison table.
+ */
 public class ProductComparison {
     private int id;
     private RoadBike roadBike;
     private String size;
     private String color;
-    private float price;
+    private String price;
     private String url;
+    private String name;
 
     public ProductComparison() {
     }
 
-    public ProductComparison(RoadBike roadBike, String size, String color, float price, String url) {
+    /**
+     * @param roadBike  road bike to link comparison to in database
+     * @param size      size of the road bike
+     * @param color     color of the road bike
+     * @param price     price corresponding to product's size and color
+     * @param url       comparison page
+     * @param name      original bike name
+     */
+    public ProductComparison(RoadBike roadBike, String size, String color, String price, String url, String name) {
         this.roadBike = roadBike;
         this.size = size;
         this.color = color;
         this.price = price;
         this.url = url;
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public int getId() {
@@ -42,11 +64,11 @@ public class ProductComparison {
         this.color = color;
     }
 
-    public float getPrice() {
+    public String getPrice() {
         return price;
     }
 
-    public void setPrice(float price) {
+    public void setPrice(String price) {
         this.price = price;
     }
 
@@ -66,13 +88,18 @@ public class ProductComparison {
         this.roadBike = roadBike;
     }
 
+    /**
+     * Checks if two instances of ProductComparison class are equal based on url, color and size.
+     *
+     * @param o instance of ProductComparison class
+     * @return boolean whether objects are equal or not
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ProductComparison that = (ProductComparison) o;
-        return roadBike.equals(that.roadBike) &&
-                size.equals(that.size) &&
+        return size.equals(that.size) &&
                 color.equals(that.color) &&
                 url.equals(that.url);
     }

@@ -11,13 +11,24 @@ import org.pmw.tinylog.Logger;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Web scraper for EansCycles website.
+ */
 public class EvansScraper extends WebScraper {
 
+    /**
+     * @param scrapeDelay   seconds to wait after finishing scraping
+     * @param bikesDao      object for database interaction
+     */
     public EvansScraper(int scrapeDelay, BikesDao bikesDao) {
         super(scrapeDelay, bikesDao);
     }
 
-
+    /**
+     * Executes first when thread is started and starts scraping.
+     * If stop thread has been triggered then scraping stops after finishing.
+     * If an exception occurs during scraping then other threads receive the stop state.
+     */
     public void run(){
         Logger.info("Evans scraper starting");
         stop = false;
@@ -33,11 +44,20 @@ public class EvansScraper extends WebScraper {
         }
     }
 
+    /**
+     * Scrapes road bikes and comparisons.
+     * Iterates through all available pages with road bikes and accesses every bike's page
+     * to scrape description, colors, sizes and price.
+     * Each found road bike is added to database
+     * and separate comparison objects are created for all available colors and sizes.
+     * Every color is clicked and then the available sizes in order to update the price.
+     *
+     * @throws Exception
+     */
     void scrape() throws Exception {
+        // get number of pages using Jsoup as selenium does not capture this element
         Document doc = Jsoup.connect("https://www.evanscycles.com/bikes/road-bikes").get();
         int pages = Integer.parseInt(doc.select(".MaxPageNumber").get(0).text());
-
-        Logger.info(pages + " pages found");
 
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
@@ -47,6 +67,7 @@ public class EvansScraper extends WebScraper {
         driver.get("https://www.evanscycles.com/bikes/road-bikes");
 
         for (int j = 0; j < pages; j++) {
+            // press on next page button after scraping first page
             if (j > 0) {
                 String nextPageRef = driver.findElement(By.className("swipeNextClick")).getAttribute("href");
                 driver.get(nextPageRef);
@@ -61,6 +82,7 @@ public class EvansScraper extends WebScraper {
 
                 String name;
                 try {
+                    // sometimes items part of the list are not available
                     name = driver.findElement(By.className("last")).getText();
                 } catch (NoSuchElementException ex) {
                     Logger.info("Bike not available:" + url);
@@ -68,58 +90,59 @@ public class EvansScraper extends WebScraper {
                     continue;
                 }
 
+                // exclude non-road bikes and electric ones
                 if (!name.contains("Road") || name.contains("Electric")) {
                     driver.get(pageURL);
                     continue;
                 }
 
-                name = name.split(" Road")[0].toUpperCase();
-
                 String imageUrl = driver.findElement(By.id("imgProduct")).getAttribute("src");
-                String description = driver.findElement(By.className("infoTabPage")).getText();
+                // get only the first paragraph of the description
+                String description = driver.findElement(By.className("infoTabPage")).getText().split("\n")[1];
                 description = description.split("KEY FEATURES")[0];
-
-                RoadBike roadBike = new RoadBike(name, imageUrl, description);
+                RoadBike roadBike = new RoadBike(shortenName(name), imageUrl, description);
                 Logger.info(roadBike);
                 bikesDao.addRoadBike(roadBike);
 
+                // check if there are multiple colors available
                 if (!driver.findElements(By.className("divColourImages")).isEmpty()) {
                     List<WebElement> colors = driver.findElements(By.className("colorImgli"));
 
                     for (WebElement color: colors) {
-                        color.click();
-                        scrapePrice(driver, roadBike, url);
+                        color.click(); // click on color to update price
+                        scrapePrice(driver, roadBike, url, name);
                     }
+
                 } else
-                    scrapePrice(driver, roadBike, url);
+                    scrapePrice(driver, roadBike, url, name);
 
                 driver.get(pageURL);
             }
         }
         driver.close();
-
     }
 
-    /** Finds price for each available size and adds it to product_comparison table
-     * @param driver - Jsoup document containing the information about sizes
-     * @param roadBike - the RoadBike object to link to in database
-     * @param url - url of the product page
+    /**
+     * Finds price for each available size and adds comparison to database
+     *
+     * @param driver    loaded product page
+     * @param roadBike  road bike to link to in database
+     * @param url       product page
+     * @param name      original bike name
      */
-    private void scrapePrice(WebDriver driver, RoadBike roadBike, String url) {
+    private void scrapePrice(WebDriver driver, RoadBike roadBike, String url, String name) {
         String colorName = driver.findElement(By.id("colourName")).getText();
+        colorName = colorName.split(" 2")[0];
         List<WebElement> sizes = driver.findElements(By.className("sizeButtonli"));
 
         for (WebElement element: sizes) {
-            element.click();
+            element.click(); // click on size to update price
 
             String size = element.getAttribute("data-text");
             String price = driver.findElement(By.id("lblSellingPrice")).getText();
-            price = price.substring(1).replaceAll(",","");
 
-            ProductComparison product = new ProductComparison(roadBike, size, colorName, Float.parseFloat(price), url);
-
+            ProductComparison product = new ProductComparison(roadBike, size, shortenColor(colorName), price, url, name);
             bikesDao.addProductComparison(product);
         }
     }
-
 }
